@@ -1,0 +1,17 @@
+{
+  "name": "borrowbox",
+  "version": "1.0.0",
+  "description": "BorrowBox - Campus Lending Platform",
+  "main": "server/server.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "install-all": "npm install && npm install --prefix server && npm install --prefix client",
+    "build:client": "npm run build --prefix client",
+    "build": "npm run build:client && node -e \"const fs = require('fs'); const path = require('path'); const src = path.join(__dirname, 'client', 'dist'); const dest = path.join(__dirname, 'server', 'public'); if (!fs.existsSync(dest)) fs.mkdirSync(dest, {recursive: true}); fs.cpSync(src, dest, {recursive: true});\"",
+    "start": "node server/server.js",
+    "seed": "node server/seed/seedData.js"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
