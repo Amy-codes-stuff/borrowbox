@@ -28,3 +28,6 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Ansible secrets and logs
+ansible/vars/secrets.yml
+*.retry

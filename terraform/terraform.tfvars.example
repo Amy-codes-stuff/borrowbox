@@ -1,0 +1,16 @@
+# AWS provider region
+aws_region = "ap-south-1"
+
+# EC2 instance type (t2.micro is free-tier eligible)
+instance_type = "t2.micro"
+
+# Name of the key pair resource in AWS
+ssh_key_name = "borrowbox-deploy-key"
+
+# The SSH public key content (usually from ~/.ssh/id_rsa.pub or similar).
+# Replace with your actual public key string.
+public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD..."
+
+# CIDR block allowed to SSH into the instance.
+# For security, restrict this to your specific public IP (e.g., "203.0.113.50/32").
+allowed_ssh_cidr = "203.0.113.50/32"
