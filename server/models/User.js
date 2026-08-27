@@ -22,6 +22,9 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: 'Computer Science & Engineering',
     },
+    password: {
+      type: String,
+    },
   },
   {
     timestamps: true,

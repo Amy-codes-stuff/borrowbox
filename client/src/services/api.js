@@ -17,6 +17,9 @@ API.interceptors.request.use((config) => {
 
 // API helper methods
 export const fetchUsers = () => API.get('/users');
+export const registerUser = (userData) => API.post('/users/register', userData);
+export const loginUser = (credentials) => API.post('/users/login', credentials);
+export const fetchCurrentUser = () => API.get('/users/me');
 export const fetchItems = (params) => API.get('/items', { params });
 export const fetchItemById = (id) => API.get(`/items/${id}`);
 export const createItem = (itemData) => API.post('/items', itemData);

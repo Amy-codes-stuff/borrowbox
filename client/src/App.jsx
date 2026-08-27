@@ -10,6 +10,8 @@ import AddEditItemPage from './pages/AddEditItemPage';
 import MyItemsPage from './pages/MyItemsPage';
 import MyRequestsPage from './pages/MyRequestsPage';
 import DashboardPage from './pages/DashboardPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
               <Route path="/my-items" element={<MyItemsPage />} />
               <Route path="/requests" element={<MyRequestsPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
             </Routes>
           </div>
 

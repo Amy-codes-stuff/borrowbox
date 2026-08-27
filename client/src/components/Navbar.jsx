@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function Navbar() {
-  const { demoUsers, currentUser, switchUser } = useUser();
+  const { demoUsers, currentUser, switchUser, isLoggedIn, logout } = useUser();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,73 +115,155 @@ export default function Navbar() {
               <span>List Item</span>
             </Link>
 
-            {/* Demo User Switcher Dropdown */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center space-x-2 p-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                title="Switch Active Demo User"
-              >
-                <img
-                  src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                  alt={currentUser?.name || 'User'}
-                  className="w-8 h-8 rounded-lg object-cover ring-2 ring-brand-500/30"
-                />
-                <div className="hidden lg:flex flex-col pr-1">
-                  <span className="text-xs font-semibold text-slate-800 leading-tight">
-                    {currentUser?.name || 'Demo User'}
-                  </span>
-                  <span className="text-[10px] text-slate-500 leading-tight">
-                    Active Demo User
-                  </span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </button>
+            {/* Login / Register links (when not logged in) */}
+            {!isLoggedIn && (
+              <div className="hidden sm:flex items-center space-x-2">
+                <Link
+                  to="/login"
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-3 py-2 rounded-xl transition-colors"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/register"
+                  className="text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 px-3 py-2 rounded-xl shadow-sm transition-colors"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
 
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                      <ArrowRightLeft className="w-3 h-3 text-brand-600" /> Demo Persona Switcher
-                    </span>
-                  </div>
-                  <div className="py-1 max-h-60 overflow-y-auto">
-                    {demoUsers.map((user) => (
-                      <button
-                        key={user._id}
-                        onClick={() => {
-                          switchUser(user);
-                          setDropdownOpen(false);
-                          // Reload current page if on dashboard/requests to reflect persona shift
-                          window.dispatchEvent(new Event('demouserchange'));
-                        }}
-                        className={`w-full text-left px-3 py-2 flex items-center space-x-3 hover:bg-brand-50/60 transition-colors ${
-                          currentUser?._id === user._id ? 'bg-brand-50/80 border-l-4 border-brand-600' : ''
-                        }`}
-                      >
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                          className="w-8 h-8 rounded-lg object-cover"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-slate-800 truncate">
-                            {user.name}
-                          </p>
-                          <p className="text-[10px] text-slate-500 truncate">
-                            {user.department}
-                          </p>
+            {/* Active User Dropdown / Switcher */}
+            <div className="relative" ref={dropdownRef}>
+              {isLoggedIn ? (
+                <>
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center space-x-2 p-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                    title="User Profile"
+                  >
+                    <img
+                      src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                      alt={currentUser?.name || 'User'}
+                      className="w-8 h-8 rounded-lg object-cover ring-2 ring-brand-500/30"
+                    />
+                    <div className="hidden lg:flex flex-col pr-1">
+                      <span className="text-xs font-semibold text-slate-800 leading-tight truncate max-w-[100px]">
+                        {currentUser?.name || 'User'}
+                      </span>
+                      <span className="text-[10px] text-brand-600 font-bold leading-tight">
+                        Logged In
+                      </span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                        <p className="text-xs font-bold text-slate-800 truncate">{currentUser?.name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{currentUser?.email}</p>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{currentUser?.department}</p>
+                      </div>
+                      <div className="p-1">
+                        <button
+                          onClick={() => {
+                            logout();
+                            setDropdownOpen(false);
+                            navigate('/');
+                          }}
+                          className="w-full text-left px-3 py-2 flex items-center space-x-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors font-semibold text-xs"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center space-x-2 p-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                    title="Switch Active Demo User"
+                  >
+                    <img
+                      src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                      alt={currentUser?.name || 'User'}
+                      className="w-8 h-8 rounded-lg object-cover ring-2 ring-brand-500/30"
+                    />
+                    <div className="hidden lg:flex flex-col pr-1">
+                      <span className="text-xs font-semibold text-slate-800 leading-tight">
+                        {currentUser?.name || 'Demo User'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 leading-tight">
+                        Active Demo User
+                      </span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                          <ArrowRightLeft className="w-3 h-3 text-brand-600" /> Demo Persona Switcher
+                        </span>
+                      </div>
+                      <div className="py-1 max-h-60 overflow-y-auto">
+                        {demoUsers.map((user) => (
+                          <button
+                            key={user._id}
+                            onClick={() => {
+                              switchUser(user);
+                              setDropdownOpen(false);
+                              window.dispatchEvent(new Event('demouserchange'));
+                            }}
+                            className={`w-full text-left px-3 py-2 flex items-center space-x-3 hover:bg-brand-50/60 transition-colors ${
+                              currentUser?._id === user._id ? 'bg-brand-50/80 border-l-4 border-brand-600' : ''
+                            }`}
+                          >
+                            <img
+                              src={user.avatar}
+                              alt={user.name}
+                              className="w-8 h-8 rounded-lg object-cover"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-slate-800 truncate">
+                                {user.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 truncate">
+                                {user.department}
+                              </p>
+                            </div>
+                            {currentUser?._id === user._id && (
+                              <UserCheck className="w-4 h-4 text-brand-600" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="px-3 pt-2 pb-2 border-t border-slate-100 text-[10px] text-slate-400 flex flex-col gap-2">
+                        <p>Switching user allows testing borrowing between Owner & Requester.</p>
+                        <div className="border-t border-slate-100 pt-2 flex items-center justify-between gap-2 sm:hidden">
+                          <Link
+                            to="/login"
+                            onClick={() => setDropdownOpen(false)}
+                            className="text-brand-600 hover:underline font-bold text-center flex-1 py-1 bg-slate-50 rounded-lg"
+                          >
+                            Log In
+                          </Link>
+                          <Link
+                            to="/register"
+                            onClick={() => setDropdownOpen(false)}
+                            className="text-slate-700 hover:underline font-bold text-center flex-1 py-1 bg-slate-50 rounded-lg"
+                          >
+                            Register
+                          </Link>
                         </div>
-                        {currentUser?._id === user._id && (
-                          <UserCheck className="w-4 h-4 text-brand-600" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="px-3 pt-2 pb-1 border-t border-slate-100 text-[10px] text-slate-400">
-                    Switching user allows testing borrowing between Owner & Requester.
-                  </div>
-                </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
