@@ -246,6 +246,7 @@
         owner: ubuntu
         group: docker
         mode: '0755'
+      become: true
       loop:
         - "{{ monitoring_root }}"
         - "{{ monitoring_root }}/grafana/provisioning/datasources"
