@@ -5,6 +5,10 @@
   vars:
     app_port: 5000
     node_env: production
+    monitoring_network: borrowbox-monitoring
+    monitoring_root: /opt/borrowbox/monitoring
+    prometheus_image: prom/prometheus:v3.5.0
+    grafana_image: grafana/grafana:12.1.1
 
   tasks:
     # 1. Wait for SSH connectivity
@@ -125,7 +129,28 @@
           changed_when: false
           no_log: true
 
-    # 8. Replace the running BorrowBox container
+    # 8. Create the private Docker network used by Prometheus and Grafana
+    - name: Check BorrowBox monitoring network
+      command:
+        argv:
+          - docker
+          - network
+          - inspect
+          - "{{ monitoring_network }}"
+      register: monitoring_network_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create BorrowBox monitoring network if absent
+      command:
+        argv:
+          - docker
+          - network
+          - create
+          - "{{ monitoring_network }}"
+      when: monitoring_network_check.rc != 0
+
+    # 9. Replace the running BorrowBox container
     - name: Remove previous BorrowBox container if present
       command:
         argv:
@@ -149,6 +174,8 @@
           - "80:{{ app_port }}"
           - --restart
           - unless-stopped
+          - --network
+          - "{{ monitoring_network }}"
           - --env
           - "PORT={{ app_port }}"
           - --env
@@ -160,7 +187,7 @@
         MONGODB_URI: "{{ mongodb_uri }}"
       no_log: true
 
-    # 9. Require the application's database-aware health check to pass
+    # 10. Require the application's database-aware health check to pass
     - name: Verify BorrowBox API health
       uri:
         url: http://localhost/api/health
@@ -169,3 +196,176 @@
       until: health_check.status == 200
       retries: 12
       delay: 5
+
+    # 11. Ensure persistent monitoring volumes exist
+    - name: Check Prometheus data volume
+      command:
+        argv:
+          - docker
+          - volume
+          - inspect
+          - borrowbox-prometheus-data
+      register: prometheus_volume_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create Prometheus data volume if absent
+      command:
+        argv:
+          - docker
+          - volume
+          - create
+          - borrowbox-prometheus-data
+      when: prometheus_volume_check.rc != 0
+
+    - name: Check Grafana data volume
+      command:
+        argv:
+          - docker
+          - volume
+          - inspect
+          - borrowbox-grafana-data
+      register: grafana_volume_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create Grafana data volume if absent
+      command:
+        argv:
+          - docker
+          - volume
+          - create
+          - borrowbox-grafana-data
+      when: grafana_volume_check.rc != 0
+
+    # 12. Install monitoring configuration on the EC2 host
+    - name: Create monitoring configuration directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: ubuntu
+        group: docker
+        mode: '0755'
+      loop:
+        - "{{ monitoring_root }}"
+        - "{{ monitoring_root }}/grafana/provisioning/datasources"
+        - "{{ monitoring_root }}/grafana/provisioning/dashboards"
+        - "{{ monitoring_root }}/grafana/dashboards"
+
+    - name: Copy Prometheus scrape configuration
+      copy:
+        src: "{{ playbook_dir }}/../monitoring/prometheus.yml"
+        dest: "{{ monitoring_root }}/prometheus.yml"
+        owner: ubuntu
+        group: docker
+        mode: '0644'
+
+    - name: Copy Grafana Prometheus datasource configuration
+      copy:
+        src: "{{ playbook_dir }}/../monitoring/grafana/provisioning/datasources/prometheus.yml"
+        dest: "{{ monitoring_root }}/grafana/provisioning/datasources/prometheus.yml"
+        owner: ubuntu
+        group: docker
+        mode: '0644'
+
+    - name: Copy Grafana dashboard provisioning configuration
+      copy:
+        src: "{{ playbook_dir }}/../monitoring/grafana/provisioning/dashboards/default.yml"
+        dest: "{{ monitoring_root }}/grafana/provisioning/dashboards/default.yml"
+        owner: ubuntu
+        group: docker
+        mode: '0644'
+
+    - name: Copy BorrowBox Grafana dashboard
+      copy:
+        src: "{{ playbook_dir }}/../monitoring/grafana/dashboards/borrowbox.json"
+        dest: "{{ monitoring_root }}/grafana/dashboards/borrowbox.json"
+        owner: ubuntu
+        group: docker
+        mode: '0644'
+
+    # 13. Pull monitoring images before replacing existing monitoring containers
+    - name: Pull Prometheus image
+      command:
+        argv:
+          - docker
+          - pull
+          - "{{ prometheus_image }}"
+
+    - name: Pull Grafana image
+      command:
+        argv:
+          - docker
+          - pull
+          - "{{ grafana_image }}"
+
+    # 14. Recreate monitoring containers on the internal network
+    - name: Remove previous Prometheus container if present
+      command:
+        argv:
+          - docker
+          - rm
+          - --force
+          - prometheus
+      register: previous_prometheus
+      failed_when: previous_prometheus.rc not in [0, 1]
+      changed_when: previous_prometheus.rc == 0
+
+    - name: Run Prometheus without a host port
+      command:
+        argv:
+          - docker
+          - run
+          - --detach
+          - --name
+          - prometheus
+          - --network
+          - "{{ monitoring_network }}"
+          - --restart
+          - unless-stopped
+          - --mount
+          - "type=bind,src={{ monitoring_root }}/prometheus.yml,dst=/etc/prometheus/prometheus.yml,readonly"
+          - --mount
+          - type=volume,src=borrowbox-prometheus-data,dst=/prometheus
+          - "{{ prometheus_image }}"
+          - --config.file=/etc/prometheus/prometheus.yml
+          - --storage.tsdb.path=/prometheus
+          - --storage.tsdb.retention.time=3d
+
+    - name: Remove previous Grafana container if present
+      command:
+        argv:
+          - docker
+          - rm
+          - --force
+          - grafana
+      register: previous_grafana
+      failed_when: previous_grafana.rc not in [0, 1]
+      changed_when: previous_grafana.rc == 0
+
+    - name: Run Grafana bound to localhost only
+      command:
+        argv:
+          - docker
+          - run
+          - --detach
+          - --name
+          - grafana
+          - --network
+          - "{{ monitoring_network }}"
+          - --restart
+          - unless-stopped
+          - --publish
+          - 127.0.0.1:3000:3000
+          - --mount
+          - type=volume,src=borrowbox-grafana-data,dst=/var/lib/grafana
+          - --mount
+          - "type=bind,src={{ monitoring_root }}/grafana/provisioning,dst=/etc/grafana/provisioning,readonly"
+          - --mount
+          - "type=bind,src={{ monitoring_root }}/grafana/dashboards,dst=/var/lib/grafana/dashboards,readonly"
+          - --env
+          - GF_AUTH_ANONYMOUS_ENABLED=true
+          - --env
+          - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+          - "{{ grafana_image }}"
+      no_log: true

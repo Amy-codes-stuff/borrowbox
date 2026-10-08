@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const promClient = require('prom-client');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -16,6 +17,58 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 
 const app = express();
+const metricsRegistry = new promClient.Registry();
+const apiRoutePrefixes = ['/api/users', '/api/items', '/api/requests', '/api/dashboard', '/api/ai'];
+const supportedMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']);
+
+promClient.collectDefaultMetrics({ register: metricsRegistry });
+
+const httpRequests = new promClient.Counter({
+  name: 'borrowbox_http_requests_total',
+  help: 'Total number of HTTP requests.',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [metricsRegistry],
+});
+
+const httpErrors = new promClient.Counter({
+  name: 'borrowbox_http_errors_total',
+  help: 'Total number of HTTP responses with a status code of 400 or higher.',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [metricsRegistry],
+});
+
+const httpRequestDuration = new promClient.Histogram({
+  name: 'borrowbox_http_request_duration_seconds',
+  help: 'HTTP request duration in seconds.',
+  labelNames: ['method', 'route'],
+  registers: [metricsRegistry],
+});
+
+app.use((req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  const apiPrefix = apiRoutePrefixes.find((prefix) => (
+    req.path === prefix || req.path.startsWith(`${prefix}/`)
+  ));
+
+  res.once('finish', () => {
+    const method = supportedMethods.has(req.method) ? req.method : 'OTHER';
+    const expressRoute = req.route?.path;
+    const route = typeof expressRoute === 'string'
+      ? `${apiPrefix || ''}${apiPrefix && expressRoute === '/' ? '' : expressRoute}` || '/'
+      : 'unknown';
+    const statusCode = String(res.statusCode);
+    const labels = { method, route, status_code: statusCode };
+    const durationSeconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
+
+    httpRequests.inc(labels);
+    if (res.statusCode >= 400) {
+      httpErrors.inc(labels);
+    }
+    httpRequestDuration.observe({ method, route }, durationSeconds);
+  });
+
+  next();
+});
 
 // Middleware
 app.use(cors());
@@ -41,6 +94,15 @@ app.get('/api/health', (req, res) => {
     database: databaseConnected ? 'connected' : 'disconnected',
     time: new Date().toISOString()
   });
+});
+
+app.get('/metrics', async (req, res, next) => {
+  try {
+    res.set('Content-Type', metricsRegistry.contentType);
+    res.end(await metricsRegistry.metrics());
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Serve built React frontend static files in production / built mode

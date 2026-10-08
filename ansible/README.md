@@ -17,6 +17,20 @@ The GitHub Actions workflow deploys successful pushes to `main` using Ansible an
 
 The playbook installs Docker if needed, pulls the requested image, replaces the existing `borrowbox` container, supplies MongoDB configuration directly to the container, and checks `http://localhost/api/health` until it returns HTTP 200.
 
+## Monitoring
+
+BorrowBox exposes Prometheus-formatted application and Node.js process metrics at `/metrics` on container port 5000. Prometheus scrapes `borrowbox:5000/metrics` every 15 seconds over the private `borrowbox-monitoring` Docker network. It stores metrics in the `borrowbox-prometheus-data` volume with a three-day retention period. Prometheus has no host port published.
+
+Grafana reads Prometheus through the same Docker network and provisions the `BorrowBox Monitoring` dashboard with request rate, error percentage, p95 latency, process CPU, memory, and uptime panels. Grafana data is stored in the `borrowbox-grafana-data` volume. Its host port is bound to `127.0.0.1:3000` only and anonymous access is read-only; it is not publicly reachable.
+
+To view Grafana, open an SSH tunnel from your local machine:
+
+```bash
+ssh -N -L 3000:127.0.0.1:3000 -i "$HOME/.ssh/your-ec2-key.pem" ubuntu@<EC2_HOST>
+```
+
+Then visit `http://localhost:3000`. Prometheus port 9090 and Grafana port 3000 are not opened in the AWS security group. BorrowBox remains available through host port 80 mapped to container port 5000.
+
 `AI_API_KEY` is optional. The application has a fallback description enhancer and does not require this key to run.
 
 ## Academic Demonstration SSH Note
