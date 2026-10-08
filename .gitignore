@@ -31,3 +31,5 @@ Thumbs.db
 # Ansible secrets and logs
 ansible/vars/secrets.yml
 *.retry
+
+*.pem

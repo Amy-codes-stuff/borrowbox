@@ -12,7 +12,6 @@ import {
   Search,
   Activity,
   User,
-  ShieldCheck,
   TrendingUp
 } from 'lucide-react';
 
@@ -82,6 +81,12 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div role="alert" className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          {error}
+        </div>
+      )}
 
       {/* Statistics Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">

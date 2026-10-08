@@ -2,8 +2,9 @@
 - name: Configure EC2 Instance and Deploy BorrowBox MERN Application
   hosts: webservers
   become: false
-  vars_files:
-    - vars/secrets.yml
+  vars:
+    app_port: 5000
+    node_env: production
 
   tasks:
     # 1. Wait for SSH connectivity
@@ -11,25 +12,26 @@
       wait_for_connection:
         delay: 5
         timeout: 300
+      tags: [server_setup]
 
     # 2. Update apt package metadata
     - name: Update apt package metadata
       apt:
         update_cache: yes
       become: true
+      tags: [server_setup]
 
     # 3. Install baseline prerequisite packages
     - name: Install required prerequisite packages
       apt:
         name:
-          - git
-          - curl
           - ca-certificates
           - gnupg
           - apt-transport-https
           - software-properties-common
         state: present
       become: true
+      tags: [server_setup]
 
     # 4. Install Docker Engine using official Docker repository
     - name: Create directory for Docker GPG keyring
@@ -38,6 +40,7 @@
         state: directory
         mode: '0755'
       become: true
+      tags: [server_setup]
 
     - name: Download Docker official GPG key
       get_url:
@@ -45,6 +48,7 @@
         dest: /etc/apt/keyrings/docker.asc
         mode: '0644'
       become: true
+      tags: [server_setup]
 
     - name: Add Docker official repository to apt sources
       apt_repository:
@@ -52,6 +56,7 @@
         state: present
         filename: docker
       become: true
+      tags: [server_setup]
 
     - name: Install Docker Engine and plugins
       apt:
@@ -64,6 +69,7 @@
         state: present
         update_cache: yes
       become: true
+      tags: [server_setup]
 
     # 5. Ensure the Docker service is enabled and running
     - name: Ensure Docker service is enabled and running
@@ -72,6 +78,7 @@
         state: started
         enabled: yes
       become: true
+      tags: [server_setup]
 
     # 6. Ensure ubuntu user can run Docker without sudo
     - name: Add ubuntu user to the docker group
@@ -80,81 +87,85 @@
         groups: docker
         append: yes
       become: true
+      tags: [server_setup]
 
     - name: Reset connection to apply group membership changes
       meta: reset_connection
+      tags: [server_setup]
 
-    # 7. Clone the BorrowBox repository and prepare directory
-    - name: Ensure SSH configuration directory exists on EC2 host
-      file:
-        path: /home/ubuntu/.ssh
-        state: directory
-        mode: '0700'
+    # 7. Authenticate to pull the private Docker Hub image
+    - name: Pull and prepare the versioned BorrowBox image
+      block:
+        - name: Log in to Docker Hub
+          command:
+            argv:
+              - docker
+              - login
+              - --username
+              - "{{ dockerhub_username }}"
+              - --password-stdin
+            stdin: "{{ dockerhub_token }}"
+            stdin_add_newline: false
+          no_log: true
 
-    - name: Fetch GitHub SSH host keys dynamically
-      command: ssh-keyscan -t rsa,ed25519 github.com
-      register: github_host_keys
-      changed_when: false
+        - name: Pull the requested BorrowBox image
+          command:
+            argv:
+              - docker
+              - pull
+              - "{{ image_name }}:{{ image_tag }}"
 
-    - name: Add GitHub host keys to verified known_hosts file
-      known_hosts:
-        name: github.com
-        key: "{{ item }}"
-        path: /home/ubuntu/.ssh/known_hosts
-      loop: "{{ github_host_keys.stdout_lines }}"
+      always:
+        - name: Log out from Docker Hub
+          command:
+            argv:
+              - docker
+              - logout
+          failed_when: false
+          changed_when: false
+          no_log: true
 
-    - name: Ensure deployment directory exists with correct permissions
-      file:
-        path: /home/ubuntu/borrowbox
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-        mode: '0755'
+    # 8. Replace the running BorrowBox container
+    - name: Remove previous BorrowBox container if present
+      command:
+        argv:
+          - docker
+          - rm
+          - --force
+          - borrowbox
+      register: previous_container
+      failed_when: previous_container.rc not in [0, 1]
+      changed_when: previous_container.rc == 0
 
-    - name: Clone BorrowBox repository from GitHub (private clone)
-      git:
-        repo: 'git@github.com:Amy-codes-stuff/borrowbox.git'
-        dest: /home/ubuntu/borrowbox
-        version: main
-        force: yes
+    - name: Run the versioned BorrowBox container
+      command:
+        argv:
+          - docker
+          - run
+          - --detach
+          - --name
+          - borrowbox
+          - --publish
+          - "80:{{ app_port }}"
+          - --restart
+          - unless-stopped
+          - --env
+          - "PORT={{ app_port }}"
+          - --env
+          - "NODE_ENV={{ node_env }}"
+          - --env
+          - MONGODB_URI
+          - "{{ image_name }}:{{ image_tag }}"
+      environment:
+        MONGODB_URI: "{{ mongodb_uri }}"
+      no_log: true
 
-    # 8. Create application's .env file from template (loads secrets.yml)
-    - name: Generate the application .env file from template
-      template:
-        src: templates/env.j2
-        dest: /home/ubuntu/borrowbox/.env
-        mode: '0600'
-
-    # 9. Build BorrowBox Docker image
-    - name: Build BorrowBox Docker image
-      shell:
-        cmd: docker build -t borrowbox:latest .
-        chdir: /home/ubuntu/borrowbox
-
-    # 10. Stop and remove previous BorrowBox container if it exists
-    - name: Stop existing BorrowBox container if it exists
-      shell:
-        cmd: docker stop borrowbox
-      failed_when: false
-      changed_when: false
-
-    - name: Remove existing BorrowBox container if it exists
-      shell:
-        cmd: docker rm borrowbox
-      failed_when: false
-      changed_when: false
-
-    # 11. Run the BorrowBox container (Port 80 to 5000, restart unless-stopped)
-    - name: Run BorrowBox container
-      shell:
-        cmd: docker run -d --name borrowbox -p 80:5000 --env-file /home/ubuntu/borrowbox/.env --restart unless-stopped borrowbox:latest
-
-    # 12. Verify the application is responding on port 80 after deployment
-    - name: Verify application is responding on port 80
+    # 9. Require the application's database-aware health check to pass
+    - name: Verify BorrowBox API health
       uri:
-        url: http://localhost
+        url: http://localhost/api/health
         status_code: 200
       register: health_check
       until: health_check.status == 200
-      retries: 6
-      delay: 10
+      retries: 12
+      delay: 5

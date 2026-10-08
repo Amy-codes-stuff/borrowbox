@@ -45,13 +45,13 @@ resource "aws_security_group" "borrowbox_sg" {
   name        = "borrowbox-sg"
   description = "Security group for BorrowBox EC2 instance"
 
-  # 1. SSH access (restricted to specified IP / CIDR for safety)
+  # 1. SSH access is temporarily open for the academic demonstration
   ingress {
-    description = "Restricted SSH access"
+    description = "Academic demonstration SSH access"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   # 2. HTTP access from anywhere (for production web traffic)

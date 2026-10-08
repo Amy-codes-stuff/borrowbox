@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { createItem, updateItem, fetchItemById, improveDescription } from '../services/api';
 import {
   Package,
   Sparkles,
   MapPin,
-  Clock,
   Tag,
   Image as ImageIcon,
   ArrowLeft,
@@ -68,7 +67,7 @@ export default function AddEditItemPage() {
             tags: Array.isArray(item.tags) ? item.tags.join(', ') : item.tags || '',
             imageUrl: item.imageUrl || '',
           });
-        } catch (err) {
+        } catch {
           setError('Failed to fetch item data');
         } finally {
           setFetching(false);
@@ -103,7 +102,7 @@ export default function AddEditItemPage() {
         setAiSuccess(true);
         setTimeout(() => setAiSuccess(false), 2500);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to enhance description with AI');
     } finally {
       setAiLoading(false);

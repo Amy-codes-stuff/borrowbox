@@ -9,9 +9,7 @@ import {
   Trash2,
   Clock,
   MapPin,
-  AlertCircle,
   ExternalLink,
-  MessageSquare
 } from 'lucide-react';
 
 export default function MyItemsPage() {
@@ -104,7 +102,7 @@ export default function MyItemsPage() {
           <Package className="w-16 h-16 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-slate-900 mb-1">No items listed yet</h3>
           <p className="text-xs text-slate-500 mb-6">
-            You haven't listed any items under {currentUser?.name}. Click below to add your scientific calculator, lab coat, or textbooks.
+              You haven&apos;t listed any items under {currentUser?.name}. Click below to add your scientific calculator, lab coat, or textbooks.
           </p>
           <Link
             to="/items/new"

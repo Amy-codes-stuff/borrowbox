@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Clock, ArrowRight, Shield } from 'lucide-react';
+import { MapPin, Clock, ArrowRight } from 'lucide-react';
 
 export default function ItemCard({ item }) {
   const isAvailable = item.status === 'available';

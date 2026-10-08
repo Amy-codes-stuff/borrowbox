@@ -5,11 +5,9 @@ import {
   ClipboardList,
   CheckCircle2,
   XCircle,
-  Clock,
   RotateCcw,
   User,
   MessageSquare,
-  AlertCircle,
   Calendar,
   Send,
   Inbox
@@ -179,7 +177,7 @@ export default function MyRequestsPage() {
                     {req.message && (
                       <div className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 flex items-center gap-1 max-w-xl">
                         <MessageSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="italic truncate font-medium">"{req.message}"</span>
+                        <span className="italic truncate font-medium">&quot;{req.message}&quot;</span>
                       </div>
                     )}
                   </div>

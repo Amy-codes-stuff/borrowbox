@@ -12,7 +12,6 @@ import {
   Headphones,
   TestTube,
   Package,
-  CheckCircle2,
   RefreshCw,
   XCircle
 } from 'lucide-react';
@@ -265,7 +264,7 @@ export default function ExplorePage() {
             <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-slate-900 mb-1">No items found</h3>
             <p className="text-sm text-slate-500 mb-6">
-              We couldn't find any items matching your filters. Try resetting search criteria or be the first to list an item!
+              We couldn&apos;t find any items matching your filters. Try resetting search criteria or be the first to list an item!
             </p>
             <button
               onClick={() => {

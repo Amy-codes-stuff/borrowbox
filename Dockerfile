@@ -1,7 +1,7 @@
 # Multi-stage Docker build for BorrowBox (Single-Container Production)
 
 # --- Stage 1: Build React Frontend ---
-FROM node:18-alpine AS client-builder
+FROM node:22-alpine AS client-builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY client/ ./client/
 RUN cd client && npm run build
 
 # --- Stage 2: Server & Production Runner ---
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
@@ -38,6 +38,9 @@ COPY --from=client-builder /app/client/dist ./server/public
 
 # Expose production port
 EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+	CMD node -e "fetch('http://127.0.0.1:5000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 # Command to launch Express server
 CMD ["node", "server/server.js"]

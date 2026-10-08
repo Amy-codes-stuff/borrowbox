@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -32,9 +33,12 @@ app.use('/api/ai', aiRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
-    app: 'BorrowBox API',
+  const databaseConnected = mongoose.connection.readyState === 1;
+
+  res.status(databaseConnected ? 200 : 503).json({
+    status: databaseConnected ? 'healthy' : 'unhealthy',
+    application: 'running',
+    database: databaseConnected ? 'connected' : 'disconnected',
     time: new Date().toISOString()
   });
 });
@@ -89,4 +93,8 @@ const startServer = async () => {
   }
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };

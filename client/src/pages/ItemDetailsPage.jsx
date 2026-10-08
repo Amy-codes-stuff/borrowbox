@@ -8,12 +8,10 @@ import {
   MapPin,
   Clock,
   Tag,
-  Calendar,
   Send,
   ArrowLeft,
   ShieldCheck,
   Building2,
-  Mail,
   Edit,
   Sparkles
 } from 'lucide-react';

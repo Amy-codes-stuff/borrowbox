@@ -9,7 +9,6 @@ import {
   BarChart3,
   UserCheck,
   ChevronDown,
-  Sparkles,
   ArrowRightLeft
 } from 'lucide-react';
 

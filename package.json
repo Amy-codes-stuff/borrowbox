@@ -9,6 +9,7 @@
     "build:client": "npm run build --prefix client",
     "build": "npm run build:client && node -e \"const fs = require('fs'); const path = require('path'); const src = path.join(__dirname, 'client', 'dist'); const dest = path.join(__dirname, 'server', 'public'); if (!fs.existsSync(dest)) fs.mkdirSync(dest, {recursive: true}); fs.cpSync(src, dest, {recursive: true});\"",
     "start": "node server/server.js",
+    "test": "npm run test --prefix server && npm run test --prefix client",
     "seed": "node server/seed/seedData.js"
   },
   "dependencies": {

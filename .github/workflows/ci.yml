@@ -1,0 +1,124 @@
+name: BorrowBox CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run client lint
+        run: npm run lint --prefix client
+
+      - name: Build frontend
+        run: npm run build --prefix client
+
+      - name: Build Docker image
+        run: docker build -t borrowbox:ci .
+
+      - name: Log in to Docker Hub
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag and push Docker image
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          image_name="$DOCKERHUB_USERNAME/borrowbox"
+          docker tag borrowbox:ci "$image_name:$IMAGE_TAG"
+          docker push "$image_name:$IMAGE_TAG"
+
+      - name: Install Ansible
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ansible-venv"
+          "$RUNNER_TEMP/ansible-venv/bin/pip" install ansible-core
+          echo "$RUNNER_TEMP/ansible-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare temporary deployment credentials
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          IMAGE_TAG: ${{ github.sha }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          if [[ -z "$EC2_HOST" || -z "$EC2_SSH_PRIVATE_KEY" || -z "$DOCKERHUB_USERNAME" || -z "$DOCKERHUB_TOKEN" || -z "$MONGODB_URI" ]]; then
+            echo "::error::Configure EC2_HOST, EC2_SSH_PRIVATE_KEY, DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, and MONGODB_URI secrets."
+            exit 1
+          fi
+          if [[ ! "$EC2_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::EC2_HOST must be an IPv4 address or DNS hostname."
+            exit 1
+          fi
+
+          umask 077
+          printf '%s' "$EC2_SSH_PRIVATE_KEY" | tr -d '\r' > "$RUNNER_TEMP/borrowbox-ec2-key"
+          printf '[webservers]\nborrowbox_server ansible_host=%s ansible_user=ubuntu ansible_ssh_private_key_file=%s\n' \
+            "$EC2_HOST" "$RUNNER_TEMP/borrowbox-ec2-key" > "$RUNNER_TEMP/borrowbox-inventory.ini"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          variables = {
+              "image_name": f"{os.environ['DOCKERHUB_USERNAME']}/borrowbox",
+              "image_tag": os.environ["IMAGE_TAG"],
+              "mongodb_uri": os.environ["MONGODB_URI"],
+              "dockerhub_username": os.environ["DOCKERHUB_USERNAME"],
+              "dockerhub_token": os.environ["DOCKERHUB_TOKEN"],
+          }
+          variables_file = Path(os.environ["RUNNER_TEMP"]) / "borrowbox-ansible-vars.json"
+          variables_file.write_text(json.dumps(variables))
+          variables_file.chmod(0o600)
+          PY
+
+      - name: Deploy to EC2 and verify health
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ansible
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: >-
+          ansible-playbook
+          --inventory "$RUNNER_TEMP/borrowbox-inventory.ini"
+          --extra-vars "@$RUNNER_TEMP/borrowbox-ansible-vars.json"
+          playbook.yml
+
+      - name: Remove temporary deployment credentials
+        if: always()
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: rm -f "$RUNNER_TEMP/borrowbox-ec2-key" "$RUNNER_TEMP/borrowbox-inventory.ini" "$RUNNER_TEMP/borrowbox-ansible-vars.json"
