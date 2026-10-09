@@ -12,10 +12,10 @@ The GitHub Actions workflow deploys successful pushes to `main` using Ansible an
     - `EC2_HOST` (the EC2 public IP or DNS name)
     - `EC2_SSH_PRIVATE_KEY` (the private key authorized on the EC2 instance)
     - `MONGODB_URI`
-    - `AI_API_KEY` (optional; the app has a fallback description enhancer)
-4. Ensure the EC2 instance is Ubuntu with the `ubuntu` SSH user, and that its security group permits HTTP on port 80 and SSH for the academic demonstration.
+4. Ensure the EC2 instance is Ubuntu with the `ubuntu` SSH user, and that its security group permits HTTP on port 80 and SSH only from an approved, restricted source CIDR. Do not open SSH to `0.0.0.0/0`.
+   GitHub-hosted runner addresses may not be included in that CIDR. If they cannot reach EC2, run deployment from a runner with approved network access rather than broadening SSH ingress.
 
-The playbook installs Docker if needed, pulls the requested image, replaces the existing `borrowbox` container, supplies MongoDB configuration directly to the container, and checks `http://localhost/api/health` until it returns HTTP 200.
+The playbook does not clone the GitHub repository or build on EC2. It installs Docker if needed, logs into the private Docker Hub repository, pulls the supplied `<image_name>:<image_tag>`, replaces the existing `borrowbox` container, supplies `MONGODB_URI` directly to the container, and checks `http://localhost/api/health` until it returns HTTP 200. GitHub Actions tags the image with the commit SHA.
 
 ## Monitoring
 
@@ -31,12 +31,6 @@ ssh -N -L 3000:127.0.0.1:3000 -i "$HOME/.ssh/your-ec2-key.pem" ubuntu@<EC2_HOST>
 
 Then visit `http://localhost:3000`. Prometheus port 9090 and Grafana port 3000 are not opened in the AWS security group. BorrowBox remains available through host port 80 mapped to container port 5000.
 
-`AI_API_KEY` is optional. The application has a fallback description enhancer and does not require this key to run.
-
-## Academic Demonstration SSH Note
-
-SSH is temporarily open to 0.0.0.0/0 for the academic demonstration. In a production environment, SSH access should be restricted to a trusted CIDR, VPN, bastion host, or equivalent secure access mechanism.
-
 ## Manual Ansible Syntax Check
 
 The workflow creates its inventory and variable files in the temporary GitHub runner directory. The playbook accepts `image_name`, `image_tag`, `mongodb_uri`, `dockerhub_username`, and `dockerhub_token` as extra variables.
@@ -49,6 +43,8 @@ ansible-playbook --syntax-check playbook.yml \
 
 Do not use real credentials in shell arguments or commit secret files. The workflow passes real values through a temporary, permission-restricted file outside the repository.
 
+`AI_API_KEY` is optional. The application has a fallback description enhancer and does not require this key to run.
+
 ## Local SSH Key Path Example
 
 Keep the private key on your local machine. Set its path in a local shell variable, then pass that variable to Ansible when running a manual command:
@@ -56,7 +52,13 @@ Keep the private key on your local machine. Set its path in a local shell variab
 ```bash
 cd ansible
 export BORROWBOX_SSH_KEY="$HOME/.ssh/new-borrowbox-ec2.pem"
-ansible-playbook --inventory inventory.ini --private-key "$BORROWBOX_SSH_KEY" playbook.yml
+export BORROWBOX_DEPLOY_VARS="$HOME/.config/borrowbox/deploy-vars.json"
+ansible-playbook --inventory inventory.ini \
+    --private-key "$BORROWBOX_SSH_KEY" \
+    --extra-vars "@$BORROWBOX_DEPLOY_VARS" \
+    playbook.yml
 ```
 
 The example path is a placeholder; do not add your actual key path or private key contents to the repository.
+
+Manual deployment also requires a JSON extra-vars file stored outside the repository with restrictive permissions, containing the five variables listed above. Set its path in `BORROWBOX_DEPLOY_VARS` and pass `--extra-vars "@$BORROWBOX_DEPLOY_VARS"` to `ansible-playbook`; never place real credentials in shell arguments or commit this file.

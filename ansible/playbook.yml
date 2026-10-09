@@ -11,6 +11,16 @@
     grafana_image: grafana/grafana:12.1.1
 
   tasks:
+    - name: Validate deployment variables
+      assert:
+        that:
+          - image_name is defined and image_name | length > 0
+          - image_tag is defined and image_tag | length > 0 and image_tag != 'latest'
+          - mongodb_uri is defined and mongodb_uri | length > 0
+          - dockerhub_username is defined and dockerhub_username | length > 0
+          - dockerhub_token is defined and dockerhub_token | length > 0
+        fail_msg: Required image, MongoDB, or Docker Hub deployment variables are missing or invalid.
+
     # 1. Wait for SSH connectivity
     - name: Wait for SSH connectivity
       wait_for_connection:
