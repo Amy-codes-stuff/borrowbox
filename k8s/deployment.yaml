@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: borrowbox
+  namespace: borrowbox-local
+  labels:
+    app: borrowbox
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: borrowbox
+  template:
+    metadata:
+      labels:
+        app: borrowbox
+    spec:
+      containers:
+        - name: borrowbox
+          image: borrowbox:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "5000"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: borrowbox-secrets
+                  key: MONGODB_URI
+          startupProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

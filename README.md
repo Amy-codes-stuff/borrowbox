@@ -39,6 +39,7 @@ BorrowBox is a campus peer-to-peer item sharing and lending platform designed fo
 
 ### Database
 * **MongoDB Atlas** (External cloud database or local MongoDB)
+* **In-memory mock-store fallback** when MongoDB is not configured or unavailable. Mock data is not persistent and may differ between Kubernetes replicas; it is not shared or durable storage.
 
 ### Deployment & DevOps Ready
 * **Docker** (Multi-stage single production container)
@@ -114,6 +115,7 @@ To set up your local environment variables:
    MONGODB_URI=your_mongodb_connection_string
    AI_API_KEY=your_optional_gemini_api_key
    ```
+   MongoDB is used when the connection succeeds. If the URI is absent or MongoDB is unreachable, the API starts in mock-store mode and reports a degraded state at `/api/health`.
 
 
 ---
