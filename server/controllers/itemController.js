@@ -12,7 +12,7 @@ const {
 // GET /api/items
 const getItems = async (req, res, next) => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const items = getMockItems(req.query);
       return res.json({ success: true, count: items.length, data: items });
     }
@@ -69,7 +69,7 @@ const getItems = async (req, res, next) => {
 // GET /api/items/:id
 const getItemById = async (req, res, next) => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const { item, similarItems } = getMockItemById(req.params.id);
       if (!item) {
         res.status(404);
@@ -121,7 +121,7 @@ const createItem = async (req, res, next) => {
       throw new Error('Please fill in all required fields (name, description, category, condition, location)');
     }
 
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const newItem = createMockItem(
         {
           name,
@@ -168,7 +168,7 @@ const createItem = async (req, res, next) => {
 // PUT /api/items/:id
 const updateItem = async (req, res, next) => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const updated = updateMockItem(req.params.id, req.body);
       if (!updated) {
         res.status(404);
@@ -212,7 +212,7 @@ const updateItem = async (req, res, next) => {
 // DELETE /api/items/:id
 const deleteItem = async (req, res, next) => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       deleteMockItem(req.params.id);
       return res.json({ success: true, message: 'Item removed successfully' });
     }

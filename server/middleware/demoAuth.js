@@ -6,8 +6,8 @@ const demoAuth = async (req, res, next) => {
   try {
     const demoUserId = req.headers['x-demo-user-id'] || req.query.demoUserId;
 
-    // Fall back to Mock Store only if MONGODB_URI is missing
-    if (!process.env.MONGODB_URI) {
+    // Use the mock persona whenever the runtime has selected mock-store mode.
+    if (req.app.locals.useMockStore) {
       if (demoUserId) {
         req.user = findMockUserById(demoUserId);
       } else {
@@ -16,7 +16,7 @@ const demoAuth = async (req, res, next) => {
       return next();
     }
 
-    // Normal Mongoose connection branch (no mock fallbacks)
+    // Normal Mongoose connection branch.
     if (demoUserId) {
       const user = await User.findById(demoUserId);
       if (user) {
@@ -29,7 +29,7 @@ const demoAuth = async (req, res, next) => {
     req.user = firstUser || null;
     next();
   } catch (error) {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       req.user = findMockUserById(req.headers['x-demo-user-id']);
       next();
     } else {
@@ -39,4 +39,3 @@ const demoAuth = async (req, res, next) => {
 };
 
 module.exports = demoAuth;
-

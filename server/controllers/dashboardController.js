@@ -8,7 +8,7 @@ const getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const mockDash = getMockDashboard(userId);
       return res.json({ success: true, data: mockDash });
     }

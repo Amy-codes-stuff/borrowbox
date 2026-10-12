@@ -5,6 +5,7 @@ const {
   getMockRequests,
   createMockRequest,
   updateMockRequestStatus,
+  deleteMockRequest,
 } = require('../services/mockStore');
 
 // GET /api/requests
@@ -12,7 +13,7 @@ const getRequests = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const requests = getMockRequests(userId, req.query.role);
       return res.json({ success: true, count: requests.length, data: requests });
     }
@@ -52,7 +53,7 @@ const createRequest = async (req, res, next) => {
       throw new Error('Item ID and requested duration are required');
     }
 
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const newReq = createMockRequest(itemId, requestedDuration, message, req.user);
       return res.status(201).json({ success: true, data: newReq });
     }
@@ -120,7 +121,7 @@ const updateRequestStatus = async (req, res, next) => {
       throw new Error('Invalid status option');
     }
 
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const updated = updateMockRequestStatus(req.params.id, status);
       return res.json({ success: true, data: updated });
     }
@@ -199,7 +200,11 @@ const updateRequestStatus = async (req, res, next) => {
 // DELETE /api/requests/:id
 const deleteRequest = async (req, res, next) => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
+      if (!deleteMockRequest(req.params.id)) {
+        res.status(404);
+        throw new Error('Borrow request not found');
+      }
       return res.json({ success: true, message: 'Request deleted' });
     }
 

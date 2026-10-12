@@ -1,6 +1,6 @@
 /**
  * In-Memory Mock Store for BorrowBox
- * Activated automatically whenever MongoDB server is not running locally
+ * In-memory fallback data; changes are lost when the process exits.
  */
 
 const mockUsers = [
@@ -430,6 +430,16 @@ const updateMockRequestStatus = (id, status) => {
   return req;
 };
 
+const deleteMockRequest = (id) => {
+  const requestIndex = mockRequests.findIndex((request) => request._id === id);
+  if (requestIndex === -1) {
+    return false;
+  }
+
+  mockRequests.splice(requestIndex, 1);
+  return true;
+};
+
 const getMockDashboard = (userId) => {
   const userItems = mockItems.filter((i) => i.owner._id === userId);
   const activeBorrows = mockRequests.filter((r) => r.requester._id === userId && r.status === 'approved');
@@ -473,5 +483,6 @@ module.exports = {
   getMockRequests,
   createMockRequest,
   updateMockRequestStatus,
+  deleteMockRequest,
   getMockDashboard,
 };

@@ -6,7 +6,7 @@ const { getMockUsers } = require('../services/mockStore');
 // GET /api/users
 const getUsers = async (req, res, next) => {
   try {
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       const mockUsers = getMockUsers();
       return res.json({ success: true, count: mockUsers.length, data: mockUsers });
     }
@@ -39,7 +39,7 @@ const registerUser = async (req, res, next) => {
     }
 
     // Check if running with MongoDB
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       return res.status(500).json({ success: false, message: 'Database connection is not configured' });
     }
 
@@ -87,7 +87,7 @@ const loginUser = async (req, res, next) => {
     }
 
     // Check if running with MongoDB
-    if (!process.env.MONGODB_URI) {
+    if (req.app.locals.useMockStore) {
       return res.status(500).json({ success: false, message: 'Database connection is not configured' });
     }
 
