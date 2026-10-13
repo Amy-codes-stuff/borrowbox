@@ -377,6 +377,6 @@
           - --env
           - GF_AUTH_ANONYMOUS_ENABLED=true
           - --env
-          - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+          - GF_AUTH_ANONYMOUS_ORG_ROLE=Editor
           - "{{ grafana_image }}"
       no_log: true
