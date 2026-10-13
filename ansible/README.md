@@ -21,7 +21,29 @@ The playbook does not clone the GitHub repository or build on EC2. It installs D
 
 BorrowBox exposes Prometheus-formatted application and Node.js process metrics at `/metrics` on container port 5000. Prometheus scrapes `borrowbox:5000/metrics` every 15 seconds over the private `borrowbox-monitoring` Docker network. It stores metrics in the `borrowbox-prometheus-data` volume with a three-day retention period. Prometheus has no host port published.
 
-Grafana reads Prometheus through the same Docker network and provisions the `BorrowBox Monitoring` dashboard with request rate, error percentage, p95 latency, process CPU, memory, and uptime panels. Grafana data is stored in the `borrowbox-grafana-data` volume. Its host port is bound to `127.0.0.1:3000` only and anonymous access is read-only; it is not publicly reachable.
+Grafana reads Prometheus through the same Docker network and provisions the `BorrowBox Monitoring` dashboard with request rate, error percentage, p95 latency, process CPU, memory, and uptime panels. Grafana data is stored in the `borrowbox-grafana-data` volume. Its host port is bound to `127.0.0.1:3000` only and anonymous access has the `Editor` role for the college demonstration; it is not publicly reachable.
+
+The Grafana container is recreated by the Ansible playbook on deployment with `GF_AUTH_ANONYMOUS_ENABLED=true` and `GF_AUTH_ANONYMOUS_ORG_ROLE=Editor`. Its `BORROWBOX_DEPLOYMENT_SHA` environment marker is set to the same commit SHA as the BorrowBox image tag. Ansible then verifies that the running Grafana container has both expected anonymous settings and the current deployment SHA. This task outputs only a success message or the names of mismatched settings, never the container's full environment. A successful deployment therefore confirms these values on the Ansible target for that run.
+
+The workflow creates its temporary Ansible inventory using the `EC2_HOST` Actions secret, with inventory alias `borrowbox_server` and SSH user `ubuntu`; it does not use `ansible/inventory.ini`. The public Actions run page does not reveal the secret host value. If the live container reports an older deployment SHA, verify that Grafana is being checked on the same EC2 host configured in `EC2_HOST`.
+
+The dashboard provider in `monitoring/grafana/provisioning/dashboards/default.yml` also has `allowUiUpdates: true`, and the dashboard JSON has `"editable": true`. Together these settings allow an anonymous editor to edit/save the provisioned dashboard in Grafana's database. The JSON files mounted into the container are read-only and are not updated by UI edits; use Git to version changes to the provisioned baseline.
+
+If the Edit option is missing after a successful deployment, first open the Grafana URL in a private/incognito browser window so an existing signed-in Grafana account does not determine the role. Confirm that this is the EC2 Grafana reached through the SSH tunnel below, then check `http://localhost:3000/api/user` in that same browser session to confirm the active login is `anonymous`. On the EC2 host, verify the running container has the intended environment without printing other settings:
+
+```bash
+docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' grafana \
+  | grep -E '^GF_AUTH_ANONYMOUS_(ENABLED|ORG_ROLE)='
+```
+
+Expected output includes `GF_AUTH_ANONYMOUS_ENABLED=true` and `GF_AUTH_ANONYMOUS_ORG_ROLE=Editor`. The deployment SHA can be checked without showing other environment values:
+
+```bash
+docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' grafana \
+  | grep -E '^BORROWBOX_DEPLOYMENT_SHA='
+```
+
+Compare that SHA with the commit shown on the successful `BorrowBox CI` run. Then confirm that the selected dashboard is `BorrowBox Monitoring` in the `BorrowBox` folder and test whether its Edit/Add visualization controls are available. Ansible recreates Grafana on deployment, so the playbook verifies the configured environment on its target; it does not change the role of a separate Grafana instance or an already authenticated non-anonymous user.
 
 To view Grafana, open an SSH tunnel from your local machine:
 

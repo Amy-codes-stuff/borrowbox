@@ -378,5 +378,35 @@
           - GF_AUTH_ANONYMOUS_ENABLED=true
           - --env
           - GF_AUTH_ANONYMOUS_ORG_ROLE=Editor
+          - --env
+          - "BORROWBOX_DEPLOYMENT_SHA={{ image_tag }}"
           - "{{ grafana_image }}"
       no_log: true
+
+    - name: Verify running Grafana anonymous access configuration
+      shell: |
+        docker inspect grafana | python3 -c '
+        import json
+        import sys
+
+        expected_sha = sys.argv[1]
+        container = json.load(sys.stdin)[0]
+        environment = set(container["Config"]["Env"])
+        expected = {
+            "GF_AUTH_ANONYMOUS_ENABLED=true",
+            "GF_AUTH_ANONYMOUS_ORG_ROLE=Editor",
+            f"BORROWBOX_DEPLOYMENT_SHA={expected_sha}",
+        }
+        missing = sorted(value.split("=", 1)[0] for value in expected - environment)
+        if not container["State"]["Running"]:
+            missing.append("Grafana container is not running")
+
+        if missing:
+            print("Grafana post-deployment verification failed: " + ", ".join(missing))
+            sys.exit(1)
+
+        print(f"Grafana anonymous Editor settings verified for deployment {expected_sha}")
+        ' {{ image_tag | quote }}
+      register: grafana_config_verification
+      changed_when: false
+      failed_when: grafana_config_verification.rc != 0

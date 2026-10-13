@@ -115,7 +115,7 @@ jobs:
           variables_file.chmod(0o600)
           PY
 
-      - name: Deploy to EC2 and verify health
+      - name: Deploy to EC2 and verify application and Grafana
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         working-directory: ansible
         env:
